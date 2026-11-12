@@ -9,7 +9,7 @@ on:
 jobs:
   core-and-apk:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,11 +27,11 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-35 build-tools;35.0.0
 
-      - name: Install SDK packages
-        run: |
-          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
-          yes | sdkmanager --licenses >/tmp/sdk-licenses.log || true
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses >/tmp/sdk-licenses.log || true
 
       - name: Fetch sherpa-onnx Android JNI libs
         run: |
@@ -40,24 +40,18 @@ jobs:
           curl -L --retry 5 -o downloads/sherpa-onnx-v2.0.1-android.tar.bz2 \
             https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-android.tar.bz2
           sha256sum downloads/sherpa-onnx-v2.0.1-android.tar.bz2 | tee downloads/android-libs.sha256
-          tar -xjf downloads/sherpa-onnx-v2.0.1-android.tar.bz2 -C downloads
-          # Layout may be jniLibs/<abi>/*.so or <abi>/*.so
-          if [ -d downloads/jniLibs ]; then
-            cp -a downloads/jniLibs/. android-app/app/src/main/jniLibs/
-          else
-            for abi in arm64-v8a armeabi-v7a x86_64 x86; do
-              if [ -d "downloads/$abi" ]; then
+          mkdir -p downloads/android-extract
+          tar -xjf downloads/sherpa-onnx-v2.0.1-android.tar.bz2 -C downloads/android-extract
+          find downloads/android-extract -type f -name 'lib*.so' | tee downloads/so-found.txt
+          while IFS= read -r so; do
+            abi="$(basename "$(dirname "$so")")"
+            case "$abi" in
+              arm64-v8a|armeabi-v7a|x86_64|x86)
                 mkdir -p "android-app/app/src/main/jniLibs/$abi"
-                cp -a "downloads/$abi"/*.so "android-app/app/src/main/jniLibs/$abi/" || true
-              fi
-            done
-            # nested extract folders
-            find downloads -type d -name arm64-v8a | while read d; do
-              abi=$(basename "$d")
-              mkdir -p "android-app/app/src/main/jniLibs/$abi"
-              cp -a "$d"/*.so "android-app/app/src/main/jniLibs/$abi/" || true
-            done
-          fi
+                cp -a "$so" "android-app/app/src/main/jniLibs/$abi/"
+                ;;
+            esac
+          done < downloads/so-found.txt
           find android-app/app/src/main/jniLibs -type f -name '*.so' | tee jni-libs-list.txt
           test -s jni-libs-list.txt
 
@@ -65,18 +59,16 @@ jobs:
         run: |
           set -euo pipefail
           ASSETS=android-app/app/src/main/assets
-          mkdir -p "$ASSETS"
+          mkdir -p "$ASSETS" downloads
           curl -L --retry 5 -o downloads/model-14m.tar.bz2 \
             https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23.tar.bz2
           sha256sum downloads/model-14m.tar.bz2 | tee downloads/model-14m.sha256
           tar -xjf downloads/model-14m.tar.bz2 -C "$ASSETS"
-          # Keep only files needed by LocalSherpaAdapter (type 9)
           MODEL="$ASSETS/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23"
           test -f "$MODEL/encoder-epoch-99-avg-1.int8.onnx"
           test -f "$MODEL/decoder-epoch-99-avg-1.onnx"
           test -f "$MODEL/joiner-epoch-99-avg-1.int8.onnx"
           test -f "$MODEL/tokens.txt"
-          # Drop bulky unused variants if present
           rm -rf "$MODEL/test_wavs" || true
           rm -f "$MODEL"/*.sh "$MODEL"/README.md || true
           find "$MODEL" -type f | tee model-files.txt
@@ -92,7 +84,7 @@ jobs:
         working-directory: android-app
         run: |
           set -euo pipefail
-          chmod +x ./gradlew || true
+          chmod +x ./gradlew
           ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee ../gradle-assemble.log
           test -f app/build/outputs/apk/debug/app-debug.apk
           sha256sum app/build/outputs/apk/debug/app-debug.apk | tee ../apk.sha256
