@@ -8,6 +8,7 @@ local.properties
 downloads/
 android-app/app/src/main/jniLibs/**
 !android-app/app/src/main/jniLibs/.gitkeep
+!android-app/app/src/main/jniLibs/.gitkeep
 android-app/app/src/main/assets/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23/
 *.apk
 *.aab
