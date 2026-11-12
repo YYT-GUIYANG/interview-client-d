@@ -1,0 +1,117 @@
+name: android-ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  core-and-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Core rule check
+        run: |
+          bash core/run-check.sh | tee core-check.log
+          grep -q 'CoreCheck: all checks passed' core-check.log
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install SDK packages
+        run: |
+          sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "platform-tools"
+          yes | sdkmanager --licenses >/tmp/sdk-licenses.log || true
+
+      - name: Fetch sherpa-onnx Android JNI libs
+        run: |
+          set -euo pipefail
+          mkdir -p android-app/app/src/main/jniLibs downloads
+          curl -L --retry 5 -o downloads/sherpa-onnx-v2.0.1-android.tar.bz2 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-android.tar.bz2
+          sha256sum downloads/sherpa-onnx-v2.0.1-android.tar.bz2 | tee downloads/android-libs.sha256
+          tar -xjf downloads/sherpa-onnx-v2.0.1-android.tar.bz2 -C downloads
+          # Layout may be jniLibs/<abi>/*.so or <abi>/*.so
+          if [ -d downloads/jniLibs ]; then
+            cp -a downloads/jniLibs/. android-app/app/src/main/jniLibs/
+          else
+            for abi in arm64-v8a armeabi-v7a x86_64 x86; do
+              if [ -d "downloads/$abi" ]; then
+                mkdir -p "android-app/app/src/main/jniLibs/$abi"
+                cp -a "downloads/$abi"/*.so "android-app/app/src/main/jniLibs/$abi/" || true
+              fi
+            done
+            # nested extract folders
+            find downloads -type d -name arm64-v8a | while read d; do
+              abi=$(basename "$d")
+              mkdir -p "android-app/app/src/main/jniLibs/$abi"
+              cp -a "$d"/*.so "android-app/app/src/main/jniLibs/$abi/" || true
+            done
+          fi
+          find android-app/app/src/main/jniLibs -type f -name '*.so' | tee jni-libs-list.txt
+          test -s jni-libs-list.txt
+
+      - name: Fetch Chinese 14M streaming model
+        run: |
+          set -euo pipefail
+          ASSETS=android-app/app/src/main/assets
+          mkdir -p "$ASSETS"
+          curl -L --retry 5 -o downloads/model-14m.tar.bz2 \
+            https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23.tar.bz2
+          sha256sum downloads/model-14m.tar.bz2 | tee downloads/model-14m.sha256
+          tar -xjf downloads/model-14m.tar.bz2 -C "$ASSETS"
+          # Keep only files needed by LocalSherpaAdapter (type 9)
+          MODEL="$ASSETS/sherpa-onnx-streaming-zipformer-zh-14M-2023-02-23"
+          test -f "$MODEL/encoder-epoch-99-avg-1.int8.onnx"
+          test -f "$MODEL/decoder-epoch-99-avg-1.onnx"
+          test -f "$MODEL/joiner-epoch-99-avg-1.int8.onnx"
+          test -f "$MODEL/tokens.txt"
+          # Drop bulky unused variants if present
+          rm -rf "$MODEL/test_wavs" || true
+          rm -f "$MODEL"/*.sh "$MODEL"/README.md || true
+          find "$MODEL" -type f | tee model-files.txt
+          sha256sum "$MODEL"/encoder-epoch-99-avg-1.int8.onnx \
+            "$MODEL"/decoder-epoch-99-avg-1.onnx \
+            "$MODEL"/joiner-epoch-99-avg-1.int8.onnx \
+            "$MODEL"/tokens.txt | tee model-required.sha256
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Assemble Debug APK
+        working-directory: android-app
+        run: |
+          set -euo pipefail
+          chmod +x ./gradlew || true
+          ./gradlew --no-daemon :app:assembleDebug 2>&1 | tee ../gradle-assemble.log
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk | tee ../apk.sha256
+          ls -lh app/build/outputs/apk/debug/app-debug.apk | tee ../apk-ls.txt
+
+      - name: Upload APK and logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: interview-client-d-artifacts
+          path: |
+            android-app/app/build/outputs/apk/debug/app-debug.apk
+            apk.sha256
+            apk-ls.txt
+            core-check.log
+            gradle-assemble.log
+            jni-libs-list.txt
+            model-required.sha256
+            downloads/android-libs.sha256
+            downloads/model-14m.sha256
+            SHERPA_ONNX_COMMIT.txt
+            docs/sherpa-onnx-upstream.txt
+          if-no-files-found: error

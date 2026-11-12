@@ -1,0 +1,37 @@
+@startuml
+title 图8-1 安卓客户端组件依赖（D）
+skinparam componentStyle rectangle
+package "Android UI" {
+  [MainActivity\n已编码/CI可编译] as UI
+}
+package "会话与结果" {
+  [AnswerSession\n已验证] as Session
+  [KeywordMatcher\n已验证] as Match
+  interface "RecognitionAdapter" as Adapter
+}
+package "输入与执行" {
+  [PcmRecorder\n已编码/待真机验证] as Capture
+  [DemoAdapter\n模拟·非识别证据] as Demo
+  [RemoteAdapter\n已编码/待 B 联调] as Remote
+  [LocalSherpaAdapter\n已编码/待真机验证] as Local
+}
+package "记录与身份" {
+  [RecordStore\n加密/账号过滤] as Store
+  [IdentityGateway\n本机测试身份] as Id
+  [AnalysisPort\n扩展边界已编码] as Analysis
+}
+UI --> Capture : 启停
+UI --> Adapter : 选择路径、收结果
+UI --> Session : 主线程更新
+Session --> Match : 完整最终文本
+UI --> Store : 保存/读取/删除
+UI --> Id : 本机测试身份
+UI ..> Analysis : 保留扩展边界
+Demo ..|> Adapter
+Remote ..|> Adapter
+Local ..|> Adapter
+Capture --> Adapter : PCM16+样本位置
+Remote --> "B 的 WSS 服务" : float32/Done
+Local --> "sherpa-onnx JNI" : 本地推理
+Store --> Id : canAccess
+@enduml
