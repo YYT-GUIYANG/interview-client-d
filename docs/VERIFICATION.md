@@ -25,3 +25,13 @@
 - APK SHA-256 安装退出码
 
 无证据时保持「待验证」，不以模拟路径冒充识别通过。
+
+
+## CI 成功记录（已取得）
+
+详见 `docs/CI_BUILD_RECORD.md`。
+
+- CI：https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43191822623
+- APK Artifact：https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43191822623/artifacts/13931286950
+- APK SHA-256：`6e879a86e02d8058684bab42714225127e38421729d650afaffdda14f669674d`（109M）
+- CoreCheck 与 assembleDebug 均已通过
