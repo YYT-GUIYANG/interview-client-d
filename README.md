@@ -31,8 +31,11 @@ cd android-app
 
 - **模拟**：仅界面/事件规则，不算识别证据。
 - **远程**：PCM16→float32 LE，结束发 `Done`；需 `wss://`。样例见 `samples/remote-adapter/`。
+- 远程连接建立后先发送 `{"answer_id":"..."}` 控制帧，再发音频；与 `B_电脑识别服务/adapter_server.py` 的接入约定一致。`samples/remote-adapter/check_protocol.py` 仅验证回环协议样例，不执行语音识别。
 - **本地**：`LocalSherpaAdapter` 调 sherpa-onnx JNI，需模型 assets 与 jniLibs。真机联调仍为待验证。
 
 ## 身份与 C 待确认
 
 `IdentityGateway` / `LocalTestIdentityGateway` 仅为本机测试身份；`account_id` 过滤已编码。正式多用户认证待 C 冻结契约后接入。
+
+手机端未取得 OPPO、B 的可信 WSS 地址和 C 的正式认证契约；相关验收状态见 `docs/VERIFICATION.md`。

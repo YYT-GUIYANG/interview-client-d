@@ -19,8 +19,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
-import struct
-import uuid
 
 try:
     import websockets
@@ -35,6 +33,10 @@ async def handle(ws):
     samples = 0
     async for message in ws:
         if isinstance(message, bytes):
+            if answer_id is None:
+                await ws.send(json.dumps({"error_code": "MISSING_ANSWER_ID", "answer_complete": False}))
+                await ws.close(code=1008, reason="answer_id required")
+                return
             # float32 little-endian mono @ 16 kHz
             if len(message) % 4 != 0:
                 await ws.send(json.dumps({"error": "BAD_AUDIO_ALIGNMENT"}))
@@ -43,8 +45,6 @@ async def handle(ws):
             samples += n
             # Placeholder: echo cumulative sample count as temporary text.
             # Replace with B's real ASR service.
-            if answer_id is None:
-                answer_id = str(uuid.uuid4())
             revision += 1
             await ws.send(
                 json.dumps(
@@ -64,7 +64,8 @@ async def handle(ws):
             text = message.strip()
             if text == "Done":
                 if answer_id is None:
-                    answer_id = str(uuid.uuid4())
+                    await ws.send(json.dumps({"error_code": "MISSING_ANSWER_ID", "answer_complete": False}))
+                    return
                 revision += 1
                 await ws.send(
                     json.dumps(
@@ -84,12 +85,17 @@ async def handle(ws):
                 await ws.close(code=1000, reason="complete")
                 return
             elif text.startswith("{"):
-                # optional JSON control: {"answer_id":"..."}
+                # Required first control frame: {"answer_id":"..."}
                 try:
                     data = json.loads(text)
-                    answer_id = data.get("answer_id", answer_id)
-                except json.JSONDecodeError:
-                    await ws.send(json.dumps({"error": "BAD_CONTROL"}))
+                    value = data["answer_id"]
+                    if answer_id is not None or not isinstance(value, str) or not 1 <= len(value) <= 128:
+                        raise ValueError("invalid answer_id")
+                    answer_id = value
+                except (ValueError, KeyError, TypeError):
+                    await ws.send(json.dumps({"error_code": "BAD_CONTROL", "answer_complete": False}))
+                    await ws.close(code=1008, reason="bad control")
+                    return
             else:
                 await ws.send(json.dumps({"error": "UNKNOWN_TEXT", "text": text}))
 

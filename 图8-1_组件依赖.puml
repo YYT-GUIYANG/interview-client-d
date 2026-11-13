@@ -12,7 +12,7 @@ package "会话与结果" {
 package "输入与执行" {
   [PcmRecorder\n已编码/待真机验证] as Capture
   [DemoAdapter\n模拟·非识别证据] as Demo
-  [RemoteAdapter\n已编码/待 B 联调] as Remote
+  [RemoteAdapter\n协议样例已测/待手机联调] as Remote
   [LocalSherpaAdapter\n已编码/待真机验证] as Local
 }
 package "记录与身份" {
@@ -31,7 +31,7 @@ Demo ..|> Adapter
 Remote ..|> Adapter
 Local ..|> Adapter
 Capture --> Adapter : PCM16+样本位置
-Remote --> "B 的 WSS 服务" : float32/Done
+Remote --> "B 的 WSS 服务" : answer_id/float32/Done
 Local --> "sherpa-onnx JNI" : 本地推理
 Store --> Id : canAccess
 @enduml

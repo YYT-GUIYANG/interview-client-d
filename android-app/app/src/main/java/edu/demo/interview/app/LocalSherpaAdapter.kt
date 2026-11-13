@@ -3,6 +3,8 @@ package edu.demo.interview.app
 import android.content.Context
 import android.content.res.AssetManager
 import android.os.SystemClock
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.k2fsa.sherpa.onnx.OnlineRecognizer
 import com.k2fsa.sherpa.onnx.OnlineRecognizerConfig
@@ -32,6 +34,7 @@ class LocalSherpaAdapter(private val context: Context) : RecognitionAdapter {
     )
 
     private val queue = ArrayBlockingQueue<AudioChunk>(64)
+    private val timeoutHandler = Handler(Looper.getMainLooper())
     private val started = AtomicBoolean(false)
     private val terminal = AtomicBoolean(false)
     @Volatile private var listener: RecognitionAdapter.Listener? = null
@@ -67,11 +70,16 @@ class LocalSherpaAdapter(private val context: Context) : RecognitionAdapter {
     }
 
     override fun finish() {
-        queue.offer(AudioChunk(FloatArray(0), -1, SystemClock.elapsedRealtimeNanos(), finish = true))
+        if (!queue.offer(AudioChunk(FloatArray(0), -1, SystemClock.elapsedRealtimeNanos(), finish = true))) {
+            listener?.onError("QUEUE_FULL", "收尾信号无法入队")
+            finishInternal(false, "本地队列满，尾段未完成")
+            return
+        }
+        timeoutHandler.postDelayed({ finishInternal(false, "本地识别收尾超时") }, 5000)
     }
 
     override fun cancel() {
-        queue.offer(AudioChunk(FloatArray(0), -1, SystemClock.elapsedRealtimeNanos(), cancel = true))
+        finishInternal(false, "已取消")
     }
 
     private fun runEngine() {
@@ -94,12 +102,15 @@ class LocalSherpaAdapter(private val context: Context) : RecognitionAdapter {
             )
             recognizer = OnlineRecognizer(assetManager = context.assets, config = config)
             stream = recognizer.createStream()
+            if (terminal.get()) return
             listener?.onReady()
 
             var segmentIndex = 0
             var revision = 0L
             var segmentSampleStart = 0L
+            var lastSampleEnd = 0L
             var lastText = ""
+            var hasFinal = false
 
             while (!terminal.get()) {
                 val chunk = queue.poll(200, TimeUnit.MILLISECONDS) ?: continue
@@ -124,17 +135,18 @@ class LocalSherpaAdapter(private val context: Context) : RecognitionAdapter {
                                 text,
                                 true,
                                 segmentSampleStart,
-                                -1,
+                                lastSampleEnd,
                                 SystemClock.elapsedRealtimeNanos()
                             )
                         )
+                        hasFinal = true
                     }
-                    finishInternal(text.isNotEmpty() || lastText.isNotEmpty(), "本地识别收尾完成")
+                    finishInternal(hasFinal, "本地识别收尾完成")
                     break
                 }
 
                 if (segmentSampleStart < 0) segmentSampleStart = chunk.sampleStart
-                if (chunk.sampleStart >= 0 && lastText.isEmpty()) segmentSampleStart = chunk.sampleStart
+                lastSampleEnd = chunk.sampleStart + chunk.samples.size
                 stream.acceptWaveform(chunk.samples, 16000)
                 while (recognizer.isReady(stream)) {
                     recognizer.decode(stream)
@@ -153,7 +165,7 @@ class LocalSherpaAdapter(private val context: Context) : RecognitionAdapter {
                             false,
                             segmentSampleStart,
                             chunk.sampleStart + chunk.samples.size,
-                            chunk.capturedAt
+                            SystemClock.elapsedRealtimeNanos()
                         )
                     )
                 }
@@ -172,6 +184,7 @@ class LocalSherpaAdapter(private val context: Context) : RecognitionAdapter {
                                 SystemClock.elapsedRealtimeNanos()
                             )
                         )
+                        hasFinal = true
                     }
                     recognizer.reset(stream)
                     segmentIndex += 1

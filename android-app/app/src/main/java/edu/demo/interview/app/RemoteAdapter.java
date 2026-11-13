@@ -30,6 +30,7 @@ public final class RemoteAdapter implements RecognitionAdapter {
     private boolean ready;
     private boolean terminal;
     private boolean completeSignal;
+    private boolean finishSent;
 
     public RemoteAdapter(String url) {
         if (url == null || !url.startsWith("wss://"))
@@ -45,21 +46,51 @@ public final class RemoteAdapter implements RecognitionAdapter {
             @Override public void onOpen(WebSocket ws, Response response) {
                 synchronized (RemoteAdapter.this) {
                     if (terminal) { ws.cancel(); return; }
+                    // B's adapter accepts this control frame before any audio bytes.
+                    boolean sent;
+                    try { sent = ws.send(new JSONObject().put("answer_id", answerId).toString()); }
+                    catch (Exception e) { sent = false; }
+                    if (!sent) {
+                        finishCallback(false, "回答号发送失败");
+                        ws.cancel();
+                        return;
+                    }
                     ready = true;
                 }
                 callback.onReady();
             }
             @Override public void onMessage(WebSocket ws, String message) {
                 try {
+                    synchronized (RemoteAdapter.this) { if (terminal) return; }
                     JSONObject data = new JSONObject(message);
                     if (data.has("answer_id") && !answerId.equals(data.getString("answer_id"))) {
                         callback.onError("WRONG_ANSWER", "服务端回答号不一致");
                         return;
                     }
                     if (data.optBoolean("answer_complete", false)) {
+                        synchronized (RemoteAdapter.this) {
+                            if (!finishSent) {
+                                callback.onError("EARLY_COMPLETE", "停止前收到完成信号");
+                                finishCallback(false, "服务端完成信号过早");
+                                ws.cancel();
+                                return;
+                            }
+                        }
                         synchronized (RemoteAdapter.this) { completeSignal = true; }
                         finishCallback(true, "服务端确认结束");
                         ws.close(1000, "complete");
+                        return;
+                    }
+                    if (data.has("error_code") || data.has("error")) {
+                        String code = data.optString("error_code", data.optString("error", "REMOTE_ERROR"));
+                        callback.onError(code, "服务端报告错误");
+                        finishCallback(false, "服务端未完成：" + code);
+                        ws.cancel();
+                        return;
+                    }
+                    if (data.has("answer_complete")) {
+                        finishCallback(false, "服务端明确标记未完成");
+                        ws.cancel();
                         return;
                     }
                     String text = data.optString("text", "");
@@ -94,7 +125,7 @@ public final class RemoteAdapter implements RecognitionAdapter {
                                                    long capturedAtElapsedNanos) {
         if (!ready || terminal || socket == null) return;
         if (count <= 0 || count > pcm16.length) throw new IllegalArgumentException("sample count");
-        if (socket.queueSize() > MAX_QUEUE_BYTES) {
+        if (socket.queueSize() + (long) count * 4 > MAX_QUEUE_BYTES) {
             listener.onError("QUEUE_FULL", "发送队列超过 2 MiB");
             finishCallback(false, "网络积压，回答未完成");
             socket.cancel();
@@ -105,15 +136,18 @@ public final class RemoteAdapter implements RecognitionAdapter {
         if (!socket.send(ByteString.of(bytes.array()))) {
             listener.onError("SEND_FAILED", "音频发送失败");
             finishCallback(false, "发送失败，回答未完成");
+            socket.cancel();
         }
         // Sample range and elapsed time are supplied by capture for later telemetry integration.
     }
 
     @Override public synchronized void finish() {
+        if (finishSent || terminal) return;
         if (!ready || terminal || socket == null) {
             finishCallback(false, "未建立连接");
             return;
         }
+        finishSent = true;
         if (!socket.send("Done")) {
             finishCallback(false, "结束信号发送失败");
             return;

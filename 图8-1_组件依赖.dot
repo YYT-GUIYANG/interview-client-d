@@ -1,17 +1,18 @@
 digraph ClientD {
-  graph [rankdir=LR, fontname="Noto Sans CJK SC", label="图8-1 安卓客户端组件依赖（D 原型）", labelloc=t];
+  graph [rankdir=LR, fontname="Noto Sans CJK SC", label="图8-1 安卓客户端组件依赖（D）", labelloc=t];
   node [shape=box, style="rounded,filled", fillcolor="#eaf2f8", fontname="Noto Sans CJK SC"];
   edge [fontname="Noto Sans CJK SC"];
-  UI [label="MainActivity\n已编码 / 待编译"];
+  UI [label="MainActivity\n已编码 / 旧版 CI 已编译"];
   Capture [label="PcmRecorder\n已编码 / 待真机验证"];
   Interface [label="RecognitionAdapter\n公共接口", fillcolor="#d5f5e3"];
   Demo [label="DemoAdapter\n模拟"];
-  Remote [label="RemoteAdapter\n待 B 联调"];
-  Local [label="LocalSherpaAdapter\n计划", fillcolor="#fdebd0"];
+  Remote [label="RemoteAdapter\n协议样例已测 / 待手机联调"];
+  Local [label="LocalSherpaAdapter\n已编码 / 待真机验证"];
   Session [label="AnswerSession\n已通过规则检查"];
   Match [label="KeywordMatcher\n已通过规则检查"];
-  Store [label="RecordStore\n待真机验证"];
-  Analysis [label="AnalysisPort\n计划", fillcolor="#fdebd0"];
+  Store [label="RecordStore\n加密与账号过滤 / 待真机验证"];
+  Identity [label="IdentityGateway\n本机测试身份 / 正式认证待 C"];
+  Analysis [label="AnalysisPort\n扩展边界已编码"];
   UI -> Capture [label="启停"];
   Capture -> Interface [label="PCM16 / 样本位置"];
   UI -> Interface [label="配置 / 结果"];
@@ -21,5 +22,10 @@ digraph ClientD {
   UI -> Session;
   Session -> Match [label="累计最终文本"];
   UI -> Store [label="保存 / 读取 / 删除"];
+  Store -> Identity [label="canAccess"];
+  Remote -> B [label="answer_id / float32 / Done"];
+  B [label="B 的 WSS 服务\n电脑端已有独立证据", fillcolor="#fdebd0"];
+  Local -> Sherpa [label="本地推理"];
+  Sherpa [label="sherpa-onnx JNI", fillcolor="#fdebd0"];
   UI -> Analysis [style=dashed];
 }

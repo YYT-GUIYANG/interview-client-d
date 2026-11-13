@@ -25,6 +25,11 @@ jobs:
           bash core/run-check.sh | tee core-check.log
           grep -q 'CoreCheck: all checks passed' core-check.log
 
+      - name: Check D remote protocol fixture
+        run: |
+          python3 -m pip install 'websockets==16.0'
+          python3 samples/remote-adapter/check_protocol.py | tee protocol-check.log
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -99,6 +104,7 @@ jobs:
             apk.sha256
             apk-ls.txt
             core-check.log
+            protocol-check.log
             gradle-assemble.log
             jni-libs-list.txt
             model-required.sha256

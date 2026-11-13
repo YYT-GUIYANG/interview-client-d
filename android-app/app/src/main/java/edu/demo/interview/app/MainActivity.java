@@ -52,6 +52,7 @@ public final class MainActivity extends Activity {
     private final IdentityGateway identity = new LocalTestIdentityGateway();
     private String answerId;
     private String questionId;
+    private String recordAccountId;
     private String path;
     private long startElapsedNanos;
     private long totalSamples;
@@ -187,6 +188,7 @@ public final class MainActivity extends Activity {
                 keywords.add(new KeywordMatcher.Keyword(entry.getString("keyword_id"), entry.getString("keyword")));
             }
             answerId = UUID.randomUUID().toString();
+            recordAccountId = identity.current().get().accountId;
             trace = new JSONArray();
             totalSamples = 0;
             session = new AnswerSession(answerId, keywords);
@@ -205,6 +207,10 @@ public final class MainActivity extends Activity {
             statusView.setText("状态：连接中 / 启动中 · " + path);
             adapter.start(answerId, new RecognitionAdapter.Listener() {
                 @Override public void onReady() { runOnUiThread(() -> {
+                    if (session == null || session.status() != AnswerSession.Status.RECORDING) return;
+                    try { appendTrace(new JSONObject().put("kind", "adapter_ready")
+                            .put("elapsed_nanos", SystemClock.elapsedRealtimeNanos())); }
+                    catch (Exception ignored) { }
                     statusView.setText("状态：录音中 · " + path);
                     if ("remote".equals(path) || "local".equals(path)) startMicrophone();
                 }); }
@@ -239,12 +245,20 @@ public final class MainActivity extends Activity {
                         if (complete && !session.finalText().isEmpty()) session.complete();
                         else session.partial();
                         statusView.setText("状态：" + session.status() + " · " + detail);
+                        try { appendTrace(new JSONObject().put("kind", "answer_finished")
+                                .put("complete", complete).put("detail", detail)
+                                .put("elapsed_nanos", SystemClock.elapsedRealtimeNanos())); }
+                        catch (Exception ignored) { }
                         saveButton.setEnabled(true);
                     }
                     resetControls();
                 }); }
                 @Override public void onError(String code, String detail) { runOnUiThread(() -> {
                     statusView.setText("异常 " + code + "：" + detail);
+                    try { appendTrace(new JSONObject().put("kind", "error")
+                            .put("code", code).put("detail", detail)
+                            .put("elapsed_nanos", SystemClock.elapsedRealtimeNanos())); }
+                    catch (Exception ignored) { }
                 }); }
             });
         } catch (Exception e) {
@@ -318,8 +332,10 @@ public final class MainActivity extends Activity {
         try {
             JSONObject record = new JSONObject();
             IdentityGateway.Identity id = identity.current().orElseThrow(() -> new IllegalStateException("无身份"));
+            if (!recordAccountId.equals(id.accountId) || !identity.canAccess(recordAccountId))
+                throw new SecurityException("当前测试身份与开始回答时不一致，请切回原账号保存");
             record.put("answer_id", answerId);
-            record.put("account_id", id.accountId);
+            record.put("account_id", recordAccountId);
             record.put("question_id", questionId);
             record.put("config_version", "1.0");
             record.put("path", path);
