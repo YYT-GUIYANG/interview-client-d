@@ -38,4 +38,4 @@ cd android-app
 
 `IdentityGateway` / `LocalTestIdentityGateway` 仅为本机测试身份；`account_id` 过滤已编码。正式多用户认证待 C 冻结契约后接入。
 
-手机端未取得 OPPO、B 的可信 WSS 地址和 C 的正式认证契约；相关验收状态见 `docs/VERIFICATION.md`。
+真机验收表：`docs/DEVICE_ACCEPTANCE.md`。A/B/C 待填与已有证据：`docs/ABC_HANDOFF.md`。验证总表：`docs/VERIFICATION.md`。CI/APK：`docs/CI_BUILD_RECORD.md`（当前 APK SHA-256 `4c64c717…`）。

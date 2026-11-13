@@ -1,25 +1,26 @@
-# CI 构建记录（2026-11-12）
+# CI 构建记录
 
-## 链接
+## 当前源码对应成功构建（请用这一条装真机）
 
-| 项 | 链接 |
+| 项 | 链接 / 值 |
 | --- | --- |
 | 仓库 | https://github.com/YYT-GUIYANG/interview-client-d |
-| 成功 CI | https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43191822623 |
-| APK Artifact | https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43191822623/artifacts/13931286950 |
-| 源码提交 | `f65b4d13ebdebf3dd65f3c3749defe65b5a352de` |
+| 成功 CI | https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43348788191 |
+| APK Artifact | https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43348788191/artifacts/14002991886 |
+| 源码提交 | `d2d658e271c8377e8d81ece6d113ce4641f67a82` |
+| Artifact 名 | `interview-client-d-artifacts` |
+| Artifact ID | `14002991886`（约 113471026 bytes） |
+| Artifact zip SHA-256 | `5f2787546a7f69e7caeff0ec0fc08a69a7ef51feb98fe7892e7f51a881ed6a49` |
 
-## 构建结果
+### 构建结果
 
 - CoreCheck: `all checks passed`
 - `:app:assembleDebug`: BUILD SUCCESSFUL
 - APK 路径（CI）：`android-app/app/build/outputs/apk/debug/app-debug.apk`
 - APK 大小：109M
-- APK SHA-256：`6e879a86e02d8058684bab42714225127e38421729d650afaffdda14f669674d`
-- Artifact zip SHA-256：`7588aaabe80edf03b2a04312a6e2480333e1eaa042bc344f50f51cf5a7738bfe`
-- Artifact ID：`13931286950`（约 113469753 bytes）
+- **APK SHA-256：`4c64c717167d7c5244de2bdf44d823caa7250581c452e07683087552e835ae25`**
 
-## 上游与模型
+## 上游与模型（与本次 CI 一致）
 
 - sherpa-onnx 提交：`52b705f6db8db2f2c2e1af024d492c01528280b1`
 - 预编译 JNI：`sherpa-onnx-v2.0.1-android.tar.bz2`
@@ -38,9 +39,12 @@
 - Gradle 8.9 / AGP 8.7.3
 - Android SDK platforms;android-35、build-tools;35.0.0
 
-## 真机待办（无证据保持待验证）
+## 历史成功构建（旧哈希，勿用于当前源码安装）
 
-1. 从 Artifact 下载 APK，核对 SHA-256 后 `adb install -r`
-2. OPPO 授权麦克风；本地路径真实语音
-3. 远程 `wss://` 对接 B；确认 `answer_complete`
-4. 勾选 D-T1～D-T7；录屏交给组长
+| 提交 | CI | APK SHA-256 |
+| --- | --- | --- |
+| `f65b4d1…` | [43191822623](https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43191822623) | `6e879a86e02d8058684bab42714225127e38421729d650afaffdda14f669674d` |
+
+## 真机待办
+
+见 `docs/DEVICE_ACCEPTANCE.md`、`docs/ABC_HANDOFF.md`。下载须登录 GitHub；`git clone` 不含 APK。
