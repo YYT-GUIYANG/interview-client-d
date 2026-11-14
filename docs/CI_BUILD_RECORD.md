@@ -48,3 +48,16 @@
 ## 真机待办
 
 见 `docs/DEVICE_ACCEPTANCE.md`、`docs/ABC_HANDOFF.md`。下载须登录 GitHub；`git clone` 不含 APK。
+
+## 远程 WSS 联调构建（2026-11-14）
+
+| 项 | 值 |
+| --- | --- |
+| 提交 | `90699381049039dc832ae0e639f453b0edece745` |
+| CI | https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43552908036 |
+| Artifact | https://github.com/YYT-GUIYANG/interview-client-d/actions/runs/43552908036/artifacts/14096559884 |
+| APK SHA-256 | `d87e1598345cf42458fb3bf71cc5829d0add5b0058b2b8313a6c86061cca16bc` |
+| 变更 | RemoteAdapter Bearer + 联调自签信任；UI 令牌框 |
+
+安装包本地副本：`D_安卓客户端/docs/evidence/app-debug-wss-lab.apk`（勿与令牌一并公开传播）。
+
