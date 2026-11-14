@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
     private Spinner questionChoice;
     private Spinner pathChoice;
     private EditText serverAddress;
+    private EditText bearerTokenInput;
     private EditText accountField;
     private TextView questionText;
     private TextView statusView;
@@ -129,8 +130,12 @@ public final class MainActivity extends Activity {
         root.addView(pathChoice);
         serverAddress = new EditText(this);
         serverAddress.setSingleLine(true);
-        serverAddress.setHint("wss://电脑地址:端口");
+        serverAddress.setHint("wss://电脑局域网IP:6007");
         root.addView(serverAddress);
+        bearerTokenInput = new EditText(this);
+        bearerTokenInput.setSingleLine(true);
+        bearerTokenInput.setHint("远程 Bearer 令牌（与 B 一致；勿截进公开仓库）");
+        root.addView(bearerTokenInput);
         startButton = new Button(this);
         startButton.setText("开始回答");
         root.addView(startButton);
@@ -194,7 +199,9 @@ public final class MainActivity extends Activity {
             session = new AnswerSession(answerId, keywords);
             path = mode == 0 ? "demo" : (mode == 1 ? "remote" : "local");
             if (mode == 0) adapter = new DemoAdapter();
-            else if (mode == 1) adapter = new RemoteAdapter(serverAddress.getText().toString().trim());
+            else if (mode == 1) adapter = new RemoteAdapter(
+                    serverAddress.getText().toString().trim(),
+                    bearerTokenInput.getText().toString().trim());
             else adapter = new LocalSherpaAdapter(this);
             startElapsedNanos = SystemClock.elapsedRealtimeNanos();
             startButton.setEnabled(false);

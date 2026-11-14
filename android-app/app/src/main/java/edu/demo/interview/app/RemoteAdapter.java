@@ -7,8 +7,14 @@ import edu.demo.interview.RecognitionAdapter;
 import edu.demo.interview.RecognitionEvent;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -20,9 +26,10 @@ import org.json.JSONObject;
 /** Compatible with the official float32/Done input; final semantics need B's adapter. */
 public final class RemoteAdapter implements RecognitionAdapter {
     private static final long MAX_QUEUE_BYTES = 2L * 1024 * 1024;
-    private final OkHttpClient client = new OkHttpClient.Builder().build();
+    private final OkHttpClient client;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final String url;
+    private final String bearerToken;
     private final Map<String, Long> revisions = new HashMap<>();
     private WebSocket socket;
     private Listener listener;
@@ -33,15 +40,50 @@ public final class RemoteAdapter implements RecognitionAdapter {
     private boolean finishSent;
 
     public RemoteAdapter(String url) {
+        this(url, null);
+    }
+
+    /**
+     * @param bearerToken optional Bearer token for B's LAN adapter; empty skips the header
+     *                    (loopback lab only). Lab builds trust the course self-signed cert.
+     */
+    public RemoteAdapter(String url, String bearerToken) {
         if (url == null || !url.startsWith("wss://"))
             throw new IllegalArgumentException("请使用 wss:// 地址");
         this.url = url;
+        this.bearerToken = bearerToken == null ? "" : bearerToken.trim();
+        this.client = labClient();
+    }
+
+    /** Controlled-lab TrustManager for course self-signed WSS. Not for production. */
+    private static OkHttpClient labClient() {
+        try {
+            X509TrustManager trustAll = new X509TrustManager() {
+                @Override public void checkClientTrusted(X509Certificate[] chain, String authType) { }
+                @Override public void checkServerTrusted(X509Certificate[] chain, String authType) { }
+                @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+            };
+            SSLContext ssl = SSLContext.getInstance("TLS");
+            ssl.init(null, new TrustManager[]{trustAll}, new SecureRandom());
+            return new OkHttpClient.Builder()
+                    .sslSocketFactory(ssl.getSocketFactory(), trustAll)
+                    .hostnameVerifier((hostname, session) -> true)
+                    .connectTimeout(15, TimeUnit.SECONDS)
+                    .readTimeout(0, TimeUnit.MILLISECONDS)
+                    .build();
+        } catch (Exception e) {
+            throw new IllegalStateException("无法初始化联调 TLS", e);
+        }
     }
 
     @Override public synchronized void start(String id, Listener callback) {
         answerId = id;
         listener = callback;
-        Request request = new Request.Builder().url(url).build();
+        Request.Builder builder = new Request.Builder().url(url);
+        if (!bearerToken.isEmpty()) {
+            builder.header("Authorization", "Bearer " + bearerToken);
+        }
+        Request request = builder.build();
         socket = client.newWebSocket(request, new WebSocketListener() {
             @Override public void onOpen(WebSocket ws, Response response) {
                 synchronized (RemoteAdapter.this) {

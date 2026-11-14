@@ -12,6 +12,7 @@
 | `05b_档案列表_local-test-user_含最终文本背景.jpg` | 列表另一角度 | D-T1 |
 | `06_账号隔离_yyt看不到他人档案.jpg` | 换账号隔离；「老年人」命中 | D-T5,T3 |
 | `07_档案详情_路径local_账号yyt_可删除.jpg` | 详情 / 删除 | D-T1,T6,T7 |
+| `08_飞行模式_本地路径_Q03_COMPLETE.jpg` | 飞行模式+本地 COMPLETE、关键词老年人 | D-T4,T3 |
 
 ## 现场确认（截图无法区分处）
 
@@ -21,5 +22,4 @@
 ## 待现场自测补证
 
 - 远程 WSS（D 自行联调 B）
-- D-T4 断网/超时
 - ABI（`adb shell getprop ro.product.cpu.abi`）
